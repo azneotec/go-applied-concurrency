@@ -1,9 +1,13 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 func main() {
-	hello()
+	go hello()
+	time.Sleep(1 * time.Second)
 	goodbye()
 }
 
