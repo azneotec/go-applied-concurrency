@@ -12,6 +12,7 @@ type repo struct {
 	products *db.ProductDB
 	orders   *db.OrderDB
 	lock     sync.Mutex
+	incoming chan models.Order
 }
 
 type Repo interface {
@@ -28,7 +29,12 @@ func New() (Repo, error) {
 	o := repo{
 		products: p,
 		orders:   db.NewOrders(),
+		incoming: make(chan models.Order),
 	}
+
+	// start the order processor
+	go o.processOrders()
+
 	return &o, nil
 }
 
@@ -49,7 +55,9 @@ func (r *repo) CreateOrder(item models.Item) (*models.Order, error) {
 	}
 	order := models.NewOrder(item)
 	r.orders.Upsert(order)
-	r.processOrders(&order)
+
+	// place the order on the incoming orders channel
+	r.incoming <- order
 	return &order, nil
 }
 
@@ -64,12 +72,14 @@ func (r *repo) validateItem(item models.Item) error {
 	return nil
 }
 
-func (r *repo) processOrders(order *models.Order) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-	r.processOrder(order)
-	r.orders.Upsert(*order)
-	fmt.Printf("Processing order %s completed\n", order.ID)
+func (r *repo) processOrders() {
+	fmt.Println("Order processing started!")
+	for order := range r.incoming {
+		r.processOrder(&order)
+		r.orders.Upsert(order)
+		fmt.Printf("Processing order %s completed\n", order.ID)
+	}
+	fmt.Println("Order processing stopped!")
 }
 
 func (r *repo) processOrder(order *models.Order) {
