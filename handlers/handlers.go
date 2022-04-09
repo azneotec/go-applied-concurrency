@@ -7,10 +7,12 @@ import (
 	"github.com/azad/go-applied-concurrency/repo"
 	"github.com/gorilla/mux"
 	"net/http"
+	"sync"
 )
 
 type handler struct {
 	repo repo.Repo
+	once sync.Once
 }
 
 type Handler interface {
@@ -18,6 +20,7 @@ type Handler interface {
 	ProductIndex(w http.ResponseWriter, r *http.Request)
 	OrderShow(w http.ResponseWriter, r *http.Request)
 	OrderInsert(w http.ResponseWriter, r *http.Request)
+	Close(w http.ResponseWriter, r *http.Request)
 }
 
 func New() (Handler, error) {
@@ -72,4 +75,15 @@ func (h handler) OrderInsert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeResponse(w, http.StatusCreated, order, nil)
+}
+
+func (h *handler) Close(w http.ResponseWriter, r *http.Request) {
+	h.invokeClose()
+	writeResponse(w, http.StatusOK, "The Orders App is now closed!", nil)
+}
+
+func (h *handler) invokeClose() {
+	h.once.Do(func() {
+		h.repo.Close()
+	})
 }
