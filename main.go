@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+var greetings = []string{"Hello!", "Ciao!", "Hola!", "Hej!", "Salut!"}
+
 func main() {
 	// create a channel
 	//ch := make(chan string) // unbuffered channel
@@ -12,20 +14,26 @@ func main() {
 	// start the greeter to provide a greeting
 	go greet(ch)
 	// sleep for a long time
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 	fmt.Println("Main ready!")
-	// receive greeting
-	greeting := <-ch
-	// sleep and print
-	time.Sleep(2 * time.Second)
-	fmt.Println("Greeting received!")
-	fmt.Println(greeting)
+	for {
+		// receive greeting
+		greeting, ok := <-ch
+		if !ok {
+			return
+		}
+		// sleep and print
+		time.Sleep(500 * time.Millisecond)
+		fmt.Println("Greeting received!", greeting)
+	}
 }
 
 // greet writes a greet to the given channel and then says goodbye
 func greet(ch chan string) {
-	fmt.Printf("Greeter ready!\nGreeter waiting to send greeting...\n")
-	// greet
-	ch <- "Hello, world!"
+	fmt.Println("Greeter ready!")
+	for _, g := range greetings {
+		ch <- g
+	}
+	close(ch)
 	fmt.Println("Greeter completed!")
 }
