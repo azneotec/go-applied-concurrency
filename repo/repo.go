@@ -5,11 +5,13 @@ import (
 	"github.com/azad/go-applied-concurrency/db"
 	"github.com/azad/go-applied-concurrency/models"
 	"math"
+	"sync"
 )
 
 type repo struct {
 	products *db.ProductDB
 	orders   *db.OrderDB
+	lock     sync.Mutex
 }
 
 type Repo interface {
@@ -63,6 +65,8 @@ func (r *repo) validateItem(item models.Item) error {
 }
 
 func (r *repo) processOrders(order *models.Order) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
 	r.processOrder(order)
 	r.orders.Upsert(*order)
 	fmt.Printf("Processing order %s completed\n", order.ID)
