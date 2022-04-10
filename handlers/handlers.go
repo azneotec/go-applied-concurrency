@@ -21,6 +21,7 @@ type Handler interface {
 	OrderShow(w http.ResponseWriter, r *http.Request)
 	OrderInsert(w http.ResponseWriter, r *http.Request)
 	Close(w http.ResponseWriter, r *http.Request)
+	Stats(w http.ResponseWriter, r *http.Request)
 }
 
 func New() (Handler, error) {
@@ -86,4 +87,9 @@ func (h *handler) invokeClose() {
 	h.once.Do(func() {
 		h.repo.Close()
 	})
+}
+
+func (h *handler) Stats(w http.ResponseWriter, r *http.Request) {
+	h.invokeClose()
+	writeResponse(w, http.StatusOK, "The Orders App is now closed!", nil)
 }

@@ -19,6 +19,8 @@ func ConfigureHandler(handler Handler) *mux.Router {
 		Handler(http.HandlerFunc(handler.OrderInsert))
 	router.Methods("GET").Path("/close").
 		Handler(http.HandlerFunc(handler.Close))
+	router.Methods("GET").Path("/stats").
+		Handler(http.HandlerFunc(handler.Stats))
 
 	return router
 }
