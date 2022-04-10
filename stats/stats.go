@@ -7,10 +7,13 @@ import (
 	"time"
 )
 
+const WorkerCount = 3
+
 type statsService struct {
 	result    Result
 	processed <-chan models.Order
 	done      <-chan struct{}
+	pStats    chan models.Statistics
 }
 
 type StatsService interface {
@@ -22,9 +25,14 @@ func New(processed <-chan models.Order, done <-chan struct{}) StatsService {
 		result:    &result{},
 		processed: processed,
 		done:      done,
+		pStats:    make(chan models.Statistics, WorkerCount),
 	}
 
-	go s.processStats()
+	for i := 0; i < WorkerCount; i++ {
+		go s.processStats()
+	}
+
+	go s.reconcile()
 	return &s
 }
 
@@ -35,7 +43,7 @@ func (s *statsService) processStats() {
 		select {
 		case order := <-s.processed:
 			pstats := s.processOrder(order)
-			s.reconcile(pstats)
+			s.pStats <- pstats
 		case <-s.done:
 			fmt.Println("Stats processing stopped!")
 			return
@@ -45,8 +53,17 @@ func (s *statsService) processStats() {
 
 // reconcile is a helper method which saves stats object
 // back into the statisticsService
-func (s *statsService) reconcile(pstats models.Statistics) {
-	s.result.Combine(pstats)
+func (s *statsService) reconcile() {
+	fmt.Println("Reconcile started!")
+	for {
+		select {
+		case p := <-s.pStats:
+			s.result.Combine(p)
+		case <-s.done:
+			fmt.Println("Reconcile stopped!")
+			return
+		}
+	}
 }
 
 // processOrder is a helper method that incorporates the current order in the stats service

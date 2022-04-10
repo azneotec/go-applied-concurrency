@@ -4,16 +4,19 @@ import (
 	"fmt"
 	"github.com/azad/go-applied-concurrency/db"
 	"github.com/azad/go-applied-concurrency/models"
+	"github.com/azad/go-applied-concurrency/stats"
 	"math"
 	"sync"
 )
 
 type repo struct {
-	products *db.ProductDB
-	orders   *db.OrderDB
-	lock     sync.Mutex
-	incoming chan models.Order
-	done     chan struct{}
+	products  *db.ProductDB
+	orders    *db.OrderDB
+	stats     stats.StatsService
+	lock      sync.Mutex
+	incoming  chan models.Order
+	done      chan struct{}
+	processed chan models.Order
 }
 
 type Repo interface {
@@ -21,18 +24,24 @@ type Repo interface {
 	GetAllProducts() []models.Product
 	GetOrder(id string) (models.Order, error)
 	Close()
+	GetOrderStats() models.Statistics
 }
 
 func New() (Repo, error) {
+	processed := make(chan models.Order, stats.WorkerCount)
+	done := make(chan struct{})
 	p, err := db.NewProducts()
 	if err != nil {
 		return nil, err
 	}
+	statsService := stats.New(processed, done)
 	o := repo{
-		products: p,
-		orders:   db.NewOrders(),
-		incoming: make(chan models.Order),
-		done:     make(chan struct{}),
+		products:  p,
+		orders:    db.NewOrders(),
+		stats:     statsService,
+		incoming:  make(chan models.Order),
+		done:      done,
+		processed: processed,
 	}
 
 	// start the order processor
@@ -67,6 +76,10 @@ func (r *repo) CreateOrder(item models.Item) (*models.Order, error) {
 	}
 }
 
+func (r *repo) GetOrderStats() models.Statistics {
+	return r.stats.GetStats()
+}
+
 // validateItem runs validations on a given order
 func (r *repo) validateItem(item models.Item) error {
 	if item.Amount < 1 {
@@ -86,6 +99,7 @@ func (r *repo) processOrders() {
 			r.processOrder(&order)
 			r.orders.Upsert(order)
 			fmt.Printf("Processing order %s completed\n", order.ID)
+			r.processed <- order
 		case <-r.done:
 			fmt.Println("Order processing stopped!")
 			return

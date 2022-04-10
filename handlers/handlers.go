@@ -83,13 +83,12 @@ func (h *handler) Close(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, http.StatusOK, "The Orders App is now closed!", nil)
 }
 
+func (h *handler) Stats(w http.ResponseWriter, r *http.Request) {
+	writeResponse(w, http.StatusOK, h.repo.GetOrderStats(), nil)
+}
+
 func (h *handler) invokeClose() {
 	h.once.Do(func() {
 		h.repo.Close()
 	})
-}
-
-func (h *handler) Stats(w http.ResponseWriter, r *http.Request) {
-	h.invokeClose()
-	writeResponse(w, http.StatusOK, "The Orders App is now closed!", nil)
 }
