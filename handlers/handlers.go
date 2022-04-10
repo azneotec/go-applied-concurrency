@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/azad/go-applied-concurrency/models"
@@ -8,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	"net/http"
 	"sync"
+	"time"
 )
 
 type handler struct {
@@ -84,7 +86,15 @@ func (h *handler) Close(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) Stats(w http.ResponseWriter, r *http.Request) {
-	writeResponse(w, http.StatusOK, h.repo.GetOrderStats(), nil)
+	reqCtx := r.Context()
+	ctx, cancel := context.WithTimeout(reqCtx, 100*time.Millisecond)
+	defer cancel()
+	stats, err := h.repo.GetOrderStats(ctx)
+	if err != nil {
+		writeResponse(w, http.StatusInternalServerError, nil, err)
+		return
+	}
+	writeResponse(w, http.StatusOK, stats, nil)
 }
 
 func (h *handler) invokeClose() {

@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"context"
 	"fmt"
 	"github.com/azad/go-applied-concurrency/db"
 	"github.com/azad/go-applied-concurrency/models"
@@ -24,7 +25,7 @@ type Repo interface {
 	GetAllProducts() []models.Product
 	GetOrder(id string) (models.Order, error)
 	Close()
-	GetOrderStats() models.Statistics
+	GetOrderStats(ctx context.Context) (models.Statistics, error)
 }
 
 func New() (Repo, error) {
@@ -76,8 +77,13 @@ func (r *repo) CreateOrder(item models.Item) (*models.Order, error) {
 	}
 }
 
-func (r *repo) GetOrderStats() models.Statistics {
-	return r.stats.GetStats()
+func (r *repo) GetOrderStats(ctx context.Context) (models.Statistics, error) {
+	select {
+	case s := <-r.stats.GetStats(ctx):
+		return s, nil
+	case <-ctx.Done():
+		return models.Statistics{}, ctx.Err()
+	}
 }
 
 // validateItem runs validations on a given order
