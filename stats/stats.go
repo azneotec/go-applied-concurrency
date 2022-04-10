@@ -78,6 +78,12 @@ func (s *statsService) processOrder(order models.Order) models.Statistics {
 			Revenue:         *order.Total,
 		}
 	}
+	if order.Status == models.OrderStatus_Reversed {
+		return models.Statistics{
+			ReversedOrders: 1,
+			Revenue:        -*order.Total,
+		}
+	}
 	// otherwise the order is rejected
 	return models.Statistics{
 		RejectedOrders: 1,
@@ -88,7 +94,7 @@ func (s *statsService) processOrder(order models.Order) models.Statistics {
 func (s *statsService) GetStats(ctx context.Context) <-chan models.Statistics {
 	stats := make(chan models.Statistics)
 	go func() {
-		randomSleep()
+		//randomSleep()
 		select {
 		case stats <- s.result.Get():
 			fmt.Println("Stats fetched successfully")

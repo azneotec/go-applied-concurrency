@@ -26,6 +26,7 @@ type Repo interface {
 	GetOrder(id string) (models.Order, error)
 	Close()
 	GetOrderStats(ctx context.Context) (models.Statistics, error)
+	RequestReversal(orderID string) (*models.Order, error)
 }
 
 func New() (Repo, error) {
@@ -86,6 +87,27 @@ func (r *repo) GetOrderStats(ctx context.Context) (models.Statistics, error) {
 	}
 }
 
+func (r *repo) RequestReversal(orderID string) (*models.Order, error) {
+	// try to find the order first
+	order, err := r.orders.Find(orderID)
+	if err != nil {
+		return nil, err
+	}
+	if order.Status != models.OrderStatus_Completed {
+		return nil, fmt.Errorf("order status is %s, only completed orders can be requested for reversal", order.Status)
+	}
+	// set reversal requested
+	order.Status = models.OrderStatus_ReversalRequested
+	// place the order on the incoming orders channel
+	select {
+	case r.incoming <- order:
+		r.orders.Upsert(order)
+		return &order, nil
+	case <-r.done:
+		return nil, fmt.Errorf("sorry, the orders app is closed")
+	}
+}
+
 // validateItem runs validations on a given order
 func (r *repo) validateItem(item models.Item) error {
 	if item.Amount < 1 {
@@ -114,7 +136,15 @@ func (r *repo) processOrders() {
 }
 
 func (r *repo) processOrder(order *models.Order) {
+	// ensure the order is still completed
+	fetchedOrder, err := r.orders.Find(order.ID)
+	if err != nil || fetchedOrder.Status != models.OrderStatus_Completed {
+		fmt.Println("duplicate reversal on order", order.ID)
+	}
 	item := order.Item
+	if order.Status == models.OrderStatus_ReversalRequested {
+		item.Amount = -item.Amount
+	}
 	product, err := r.products.Find(item.ProductID)
 	if err != nil {
 		order.Status = models.OrderStatus_Rejected

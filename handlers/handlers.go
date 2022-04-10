@@ -22,6 +22,7 @@ type Handler interface {
 	ProductIndex(w http.ResponseWriter, r *http.Request)
 	OrderShow(w http.ResponseWriter, r *http.Request)
 	OrderInsert(w http.ResponseWriter, r *http.Request)
+	OrderReversal(w http.ResponseWriter, r *http.Request)
 	Close(w http.ResponseWriter, r *http.Request)
 	Stats(w http.ResponseWriter, r *http.Request)
 }
@@ -78,6 +79,18 @@ func (h handler) OrderInsert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeResponse(w, http.StatusCreated, order, nil)
+}
+
+func (h handler) OrderReversal(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	orderID := vars["orderId"]
+	o, err := h.repo.RequestReversal(orderID)
+	if err != nil {
+		writeResponse(w, http.StatusNotFound, nil, err)
+		return
+	}
+	// Send an HTTP success status & the return value from the repo
+	writeResponse(w, http.StatusOK, o, nil)
 }
 
 func (h *handler) Close(w http.ResponseWriter, r *http.Request) {
